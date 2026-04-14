@@ -18,12 +18,12 @@ namespace ContosoUniversity.Services
             });
         }
 
-        public void SendNotification(string entityType, string entityId, EntityOperation operation, string? userName = null)
+        public void SendNotification(string entityType, string entityId, EntityOperation operation, string userName = null)
         {
             SendNotification(entityType, entityId, null, operation, userName);
         }
 
-        public void SendNotification(string entityType, string entityId, string? entityDisplayName, EntityOperation operation, string? userName = null)
+        public void SendNotification(string entityType, string entityId, string entityDisplayName, EntityOperation operation, string userName = null)
         {
             try
             {
@@ -46,7 +46,7 @@ namespace ContosoUniversity.Services
             }
         }
 
-        public Notification? ReceiveNotification()
+        public Notification ReceiveNotification()
         {
             if (_channel.Reader.TryRead(out var notification))
             {
@@ -61,19 +61,19 @@ namespace ContosoUniversity.Services
             // would update the IsRead flag here.
         }
 
-        private static string GenerateMessage(string entityType, string entityId, string? entityDisplayName, EntityOperation operation)
+        private static string GenerateMessage(string entityType, string entityId, string entityDisplayName, EntityOperation operation)
         {
             var displayText = !string.IsNullOrWhiteSpace(entityDisplayName)
                 ? $"{entityType} '{entityDisplayName}'"
                 : $"{entityType} (ID: {entityId})";
 
-            return operation switch
+            switch (operation)
             {
-                EntityOperation.CREATE => $"New {displayText} has been created",
-                EntityOperation.UPDATE => $"{displayText} has been updated",
-                EntityOperation.DELETE => $"{displayText} has been deleted",
-                _ => $"{displayText} operation: {operation}"
-            };
+                case EntityOperation.CREATE: return $"New {displayText} has been created";
+                case EntityOperation.UPDATE: return $"{displayText} has been updated";
+                case EntityOperation.DELETE: return $"{displayText} has been deleted";
+                default: return $"{displayText} operation: {operation}";
+            }
         }
     }
 }

@@ -22,7 +22,7 @@ namespace ContosoUniversity.Controllers
             SendEntityNotification(entityType, entityId, null, operation);
         }
 
-        protected void SendEntityNotification(string entityType, string entityId, string? entityDisplayName, EntityOperation operation)
+        protected void SendEntityNotification(string entityType, string entityId, string entityDisplayName, EntityOperation operation)
         {
             try
             {

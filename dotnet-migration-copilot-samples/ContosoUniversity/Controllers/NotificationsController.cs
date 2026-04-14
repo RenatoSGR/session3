@@ -20,7 +20,7 @@ namespace ContosoUniversity.Controllers
 
             try
             {
-                Notification? notification;
+                Notification notification;
                 while ((notification = notificationService.ReceiveNotification()) != null)
                 {
                     notifications.Add(notification);

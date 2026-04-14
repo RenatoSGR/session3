@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using ContosoUniversity.Data;
 using ContosoUniversity.Models;
 using ContosoUniversity.Services;
@@ -48,13 +49,13 @@ namespace ContosoUniversity.Controllers
         // POST: Courses/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create([Bind("CourseID,Title,Credits,DepartmentID,TeachingMaterialImagePath")] Course course, IFormFile? teachingMaterialImage)
+        public async Task<IActionResult> Create([Bind("CourseID,Title,Credits,DepartmentID,TeachingMaterialImagePath")] Course course, IFormFile teachingMaterialImage)
         {
             if (ModelState.IsValid)
             {
                 if (teachingMaterialImage != null && teachingMaterialImage.Length > 0)
                 {
-                    var (error, relativePath) = SaveUploadedFile(teachingMaterialImage, course.CourseID, null);
+                    var (error, relativePath) = await SaveUploadedFileAsync(teachingMaterialImage, course.CourseID, null);
                     if (error != null)
                     {
                         ModelState.AddModelError("teachingMaterialImage", error);
@@ -87,13 +88,13 @@ namespace ContosoUniversity.Controllers
         // POST: Courses/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit([Bind("CourseID,Title,Credits,DepartmentID,TeachingMaterialImagePath")] Course course, IFormFile? teachingMaterialImage)
+        public async Task<IActionResult> Edit([Bind("CourseID,Title,Credits,DepartmentID,TeachingMaterialImagePath")] Course course, IFormFile teachingMaterialImage)
         {
             if (ModelState.IsValid)
             {
                 if (teachingMaterialImage != null && teachingMaterialImage.Length > 0)
                 {
-                    var (error, relativePath) = SaveUploadedFile(teachingMaterialImage, course.CourseID, course.TeachingMaterialImagePath);
+                    var (error, relativePath) = await SaveUploadedFileAsync(teachingMaterialImage, course.CourseID, course.TeachingMaterialImagePath);
                     if (error != null)
                     {
                         ModelState.AddModelError("teachingMaterialImage", error);
@@ -131,15 +132,7 @@ namespace ContosoUniversity.Controllers
             {
                 var courseTitle = course.Title;
 
-                if (!string.IsNullOrEmpty(course.TeachingMaterialImagePath))
-                {
-                    var physicalPath = Path.Combine(_environment.WebRootPath, course.TeachingMaterialImagePath.TrimStart('/'));
-                    if (System.IO.File.Exists(physicalPath))
-                    {
-                        try { System.IO.File.Delete(physicalPath); }
-                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Error deleting file: {ex.Message}"); }
-                    }
-                }
+                TryDeleteUploadedFile(course.TeachingMaterialImagePath);
 
                 db.Courses.Remove(course);
                 db.SaveChanges();
@@ -152,7 +145,7 @@ namespace ContosoUniversity.Controllers
         /// Validates, saves the uploaded file and returns (errorMessage, relativePath).
         /// On success errorMessage is null; on failure relativePath is null.
         /// </summary>
-        private (string? error, string? relativePath) SaveUploadedFile(IFormFile file, int courseId, string? existingRelativePath)
+        private async Task<(string error, string relativePath)> SaveUploadedFileAsync(IFormFile file, int courseId, string existingRelativePath)
         {
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp" };
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
@@ -165,28 +158,49 @@ namespace ContosoUniversity.Controllers
 
             try
             {
-                var uploadsPath = Path.Combine(_environment.WebRootPath, "Uploads", "TeachingMaterials");
-                Directory.CreateDirectory(uploadsPath);
+                var uploadsDirectory = Path.GetFullPath(Path.Combine(_environment.WebRootPath, "Uploads", "TeachingMaterials"));
+                Directory.CreateDirectory(uploadsDirectory);
 
-                // Delete old file if present
-                if (!string.IsNullOrEmpty(existingRelativePath))
-                {
-                    var oldPath = Path.Combine(_environment.WebRootPath, existingRelativePath.TrimStart('/'));
-                    if (System.IO.File.Exists(oldPath))
-                        System.IO.File.Delete(oldPath);
-                }
+                // Delete old file if present, with path traversal protection
+                TryDeleteUploadedFile(existingRelativePath);
 
                 var fileName = $"course_{courseId}_{Guid.NewGuid()}{extension}";
-                var filePath = Path.Combine(uploadsPath, fileName);
+                var filePath = Path.Combine(uploadsDirectory, fileName);
 
                 using var stream = new FileStream(filePath, FileMode.Create);
-                file.CopyTo(stream);
+                await file.CopyToAsync(stream);
 
                 return (null, $"/Uploads/TeachingMaterials/{fileName}");
             }
             catch (Exception ex)
             {
                 return ($"Error uploading file: {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Safely deletes an uploaded file, guarding against path traversal.
+        /// </summary>
+        private void TryDeleteUploadedFile(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath))
+                return;
+
+            try
+            {
+                var uploadsDirectory = Path.GetFullPath(Path.Combine(_environment.WebRootPath, "Uploads", "TeachingMaterials"));
+                var physicalPath = Path.GetFullPath(Path.Combine(_environment.WebRootPath, relativePath.TrimStart('/')));
+
+                // Guard against path traversal: ensure the resolved path is inside the uploads directory
+                if (!physicalPath.StartsWith(uploadsDirectory, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                if (System.IO.File.Exists(physicalPath))
+                    System.IO.File.Delete(physicalPath);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error deleting file: {ex.Message}");
             }
         }
     }

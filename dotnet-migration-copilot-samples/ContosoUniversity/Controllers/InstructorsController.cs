@@ -37,8 +37,11 @@ namespace ContosoUniversity.Controllers
             if (courseID != null)
             {
                 ViewBag.CourseID = courseID.Value;
-                viewModel.Enrollments = viewModel.Courses!.Where(
-                    x => x.CourseID == courseID).Single().Enrollments;
+                if (viewModel.Courses != null)
+                {
+                    viewModel.Enrollments = viewModel.Courses.Where(
+                        x => x.CourseID == courseID).Single().Enrollments;
+                }
             }
 
             return View(viewModel);
@@ -65,7 +68,7 @@ namespace ContosoUniversity.Controllers
         // POST: Instructors/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create([Bind("LastName,FirstMidName,HireDate,OfficeAssignment")] Instructor instructor, string[]? selectedCourses)
+        public IActionResult Create([Bind("LastName,FirstMidName,HireDate,OfficeAssignment")] Instructor instructor, string[] selectedCourses)
         {
             if (selectedCourses != null)
             {
@@ -105,7 +108,7 @@ namespace ContosoUniversity.Controllers
         // POST: Instructors/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int? id, string[]? selectedCourses)
+        public async Task<IActionResult> Edit(int? id, string[] selectedCourses)
         {
             if (id == null) return BadRequest();
 
@@ -161,7 +164,7 @@ namespace ContosoUniversity.Controllers
             ViewBag.Courses = viewModel;
         }
 
-        private void UpdateInstructorCourses(string[]? selectedCourses, Instructor instructorToUpdate)
+        private void UpdateInstructorCourses(string[] selectedCourses, Instructor instructorToUpdate)
         {
             if (selectedCourses == null)
             {
